@@ -1,0 +1,183 @@
+import matplotlib.pyplot as plt
+from matplotlib import cm
+import numpy as np
+
+def OU_process(alpha, mu, sigma, dt, num_timesteps, bound, x):
+    for t in range(1, num_timesteps):
+        dx = alpha * (mu - x[t-1]) * dt + sigma * np.sqrt(dt) * np.random.normal(0, 1)
+        x[t] = np.clip(x[t-1] + dx, -bound, bound)
+    return x
+
+def OU(alpha=0, mu=0, sigma=1, dt=0.1, num_timesteps=100, bound=0.5):
+    x = np.zeros(num_timesteps)
+    x[0] = 0
+    return OU_process(alpha, mu, sigma, dt, num_timesteps, bound, x)
+
+def zero_inflated_OU(alpha=0, mu=0, sigma=1, dt=0.1, num_timesteps=100, bound=0.5, p_zero=0.1):
+    x = np.zeros(num_timesteps)
+    x[0] = 0
+    for t in range(1, num_timesteps):
+        if np.random.uniform(0, 1) < p_zero:
+            dx = 0
+        else:
+            dx = alpha * (mu - x[t-1]) * dt + sigma * np.sqrt(dt) * np.random.normal(0, 1)
+        x[t] = x[t-1] + dx
+        x[t] = np.clip(x[t], -bound, bound)
+    return x
+
+def generate_binary_omega(num_timesteps, flip_freq=0.01, refractory_period_ratio=1, value=0.005):
+    omegas = value*np.ones(num_timesteps)
+    refractory_period = int(refractory_period_ratio * num_timesteps)
+    last_flip = -refractory_period
+    for t in range(1, num_timesteps):
+        if t - last_flip >= refractory_period and np.random.uniform(0, 1) < flip_freq:
+            omegas[t] = -omegas[t-1]
+            last_flip = t
+        else:
+            omegas[t] = omegas[t-1]
+    return omegas
+
+# def generate_dataset(num_samples, num_timesteps, omega_process='zero_inflated_OU', dt=0.5, **kwargs):
+#     inputs = np.zeros((num_samples, num_timesteps, 3))
+#     targets = np.zeros((num_samples, num_timesteps, 2))
+
+#     # np.random.seed(kwargs.get('seed', 42))
+
+#     for i in range(num_samples):
+#         if omega_process == 'zero_inflated_OU':
+#             omegas = zero_inflated_OU(num_timesteps=num_timesteps, **kwargs)
+#         elif omega_process == 'binary':
+#             omegas = generate_binary_omega(num_timesteps, **kwargs)
+#         else:
+#             raise ValueError(f'Unknown omega_process: {omega_process}')
+
+#         theta0 = 0
+#         theta = theta0
+#         x0 = np.cos(theta0)
+#         y0 = np.sin(theta0)
+
+#         for j in range(num_timesteps):
+#             omega = omegas[j]
+#             k1 = omega * dt
+#             k2 = (omega + 0.5 * k1) * dt
+#             k3 = (omega + 0.5 * k2) * dt
+#             k4 = (omega + k3) * dt
+#             dtheta = (k1 + 2 * k2 + 2 * k3 + k4) / 6
+#             theta = (theta + dtheta) % (2 * np.pi)
+
+#             inputs[i, j, 0] = omega
+#             inputs[i, j, 1] = x0
+#             inputs[i, j, 2] = y0
+
+#             targets[i, j, 0] = np.cos(theta)
+#             targets[i, j, 1] = np.sin(theta)
+
+#     return inputs, targets
+
+def plot_helper(x, y, title, x_label, y_label, plot_type='plot'):
+    if plot_type == 'hist':
+        plt.hist(x, bins=30)
+    else:
+        plt.plot(x, y)
+    plt.title(title)
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
+    plt.show()
+
+def plot_data(inputs, targets, num_timesteps, sample_idx=0):
+    fig, axs = plt.subplots(1, 2, figsize=(8,4), gridspec_kw={'width_ratios': [1, 0.05]})
+    circle = plt.Circle((0,0), radius=1, fill=False)
+    axs[0].add_patch(circle)
+    axs[0].set_xlim([-1.1, 1.1])
+    axs[0].set_ylim([-1.1, 1.1])
+    axs[0].set_aspect('equal')
+
+    cmap = cm.get_cmap('viridis')
+    colors = cmap(np.linspace(0, 1, num_timesteps))
+
+    sample_idx = 0
+
+    for i in range(num_timesteps):
+        axs[0].plot(targets[sample_idx, i, 0], targets[sample_idx, i, 1], marker='o', markersize=8, color=colors[i])
+
+    sc = axs[1].scatter([],[], c=[], cmap='viridis')
+    clb = plt.colorbar(sc, cax=axs[1])
+    clb.ax.invert_yaxis()
+    clb.set_label('Time')
+
+    plt.tight_layout()
+    plt.show()
+
+    plot_helper(range(num_timesteps), np.arctan2(targets[sample_idx, :, 1], targets[sample_idx, :, 0]), 'Direction (rad)', 'Timestep', 'Direction', 'plot')
+    plt.yticks(np.linspace(-np.pi, np.pi, 3), [r'$-\pi$', r'$0$', r'$\pi$'])
+
+    velocities = inputs[sample_idx, :, 0].reshape(-1,1)
+    plot_helper(velocities, None, 'Distribution of Angular Velocities', 'Angular Velocity', 'Count', 'hist')
+    plot_helper(range(num_timesteps), velocities, 'Angular Velocities', 'Timestep', 'Angular Velocity', 'plot')
+
+
+
+class BinaryTrajectoryGenerator:
+    def __init__(self, num_timesteps, dt=0.5, flip_freq=0.005, omega_value=0.005, refractory_period_ratio=0.3, **kwargs):
+        self.num_timesteps = num_timesteps
+        self.dt = dt
+        self.omega_value = omega_value
+        self.flip_freq = flip_freq
+        self.refractory_period_ratio = refractory_period_ratio
+        self.kwargs = kwargs
+
+
+    def generate_binary_omega(self):
+        omegas =  self.omega_value * np.ones(self.num_timesteps)
+        omegas[0] *= np.random.choice([-1,1])
+        refractory_period = int(self.refractory_period_ratio * self.num_timesteps)
+        last_flip = -refractory_period
+        for t in range(1, self.num_timesteps):
+            if t - last_flip >= refractory_period and np.random.uniform(0, 1) < self.flip_freq:
+                omegas[t] = -omegas[t-1]
+                last_flip = t
+            else:
+                omegas[t] = omegas[t-1]
+        return omegas
+
+    def generate_trajectory(self):
+
+        omegas = self.generate_binary_omega()
+        theta0 = 0
+        theta = theta0
+        x0 = np.cos(theta0)
+        y0 = np.sin(theta0)
+        inputs = np.zeros((self.num_timesteps, 3))
+        targets = np.zeros((self.num_timesteps, 2))
+
+        for j in range(self.num_timesteps):
+            omega = omegas[j]
+            k1 = omega * self.dt
+            k2 = (omega + 0.5 * k1) * self.dt
+            k3 = (omega + 0.5 * k2) * self.dt
+            k4 = (omega + k3) * self.dt
+            dtheta = (k1 + 2 * k2 + 2 * k3 + k4) / 6
+            theta = (theta + dtheta) % (2 * np.pi)
+
+            inputs[j, 0] = omega
+            inputs[j, 1] = x0
+            inputs[j, 2] = y0
+
+            targets[j, 0] = np.cos(theta)
+            targets[j, 1] = np.sin(theta)
+
+        return inputs, targets
+
+def generate_dataset(num_samples, num_timesteps, num_trajectories, **kwargs):
+    inputs = np.zeros((num_samples, num_timesteps, 3 * num_trajectories))
+    targets = np.zeros((num_samples, num_timesteps, 2 * num_trajectories))
+
+    generator = BinaryTrajectoryGenerator(num_timesteps, **kwargs)
+
+    for i in range(num_samples):
+        for j in range(num_trajectories):
+            inputs_single, targets_single = generator.generate_trajectory()
+            inputs[i, :, 3*j:3*(j+1)] = inputs_single
+            targets[i, :, 2*j:2*(j+1)] = targets_single
+
+    return inputs, targets
