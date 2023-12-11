@@ -118,36 +118,48 @@ def plot_data(inputs, targets, num_timesteps, sample_idx=0):
 
 
 class BinaryTrajectoryGenerator:
-    def __init__(self, num_timesteps, dt=0.5, flip_freq=0.005, omega_value=0.005, refractory_period_ratio=0.3, **kwargs):
+    def __init__(self, num_timesteps, dt=0.5, num_flips=5, omega_value=0.005, include_initial_position=False, **kwargs):
         self.num_timesteps = num_timesteps
         self.dt = dt
         self.omega_value = omega_value
-        self.flip_freq = flip_freq
-        self.refractory_period_ratio = refractory_period_ratio
-        self.kwargs = kwargs
+        self.num_flips = num_flips
+        self.include_initial_position = include_initial_position
 
+        self.kwargs = kwargs
 
     def generate_binary_omega(self):
         omegas =  self.omega_value * np.ones(self.num_timesteps)
-        omegas[0] *= np.random.choice([-1,1])
-        refractory_period = int(self.refractory_period_ratio * self.num_timesteps)
-        last_flip = -refractory_period
-        for t in range(1, self.num_timesteps):
-            if t - last_flip >= refractory_period and np.random.uniform(0, 1) < self.flip_freq:
-                omegas[t] = -omegas[t-1]
-                last_flip = t
+        omegas[0] *= np.random.choice([-1,1]) # random initial direction
+
+        # min_distance_between_flips = self.num_timesteps // (self.num_flips + 1)
+        min_distance_between_flips = 100
+        flip_times = []
+        for _ in range(self.num_flips):
+            if flip_times:
+                start = flip_times[-1] + min_distance_between_flips
             else:
-                omegas[t] = omegas[t-1]
+                start = min_distance_between_flips
+            if start >= self.num_timesteps - min_distance_between_flips:
+                continue
+            flip_time = np.random.choice(range(start, self.num_timesteps - min_distance_between_flips))
+            flip_times.append(flip_time)
+
+        flip_times = np.sort(flip_times)
+
+        flip_index = 0
+        for t in range(1, self.num_timesteps):
+            if flip_index < len(flip_times) and t == flip_times[flip_index]:
+                omegas[t:] *= -1
+                flip_index += 1
         return omegas
 
     def generate_trajectory(self):
-
         omegas = self.generate_binary_omega()
         theta0 = 0
         theta = theta0
         x0 = np.cos(theta0)
         y0 = np.sin(theta0)
-        inputs = np.zeros((self.num_timesteps, 3))
+        inputs = np.zeros((self.num_timesteps, 3 if self.include_initial_position else 1))
         targets = np.zeros((self.num_timesteps, 2))
 
         for j in range(self.num_timesteps):
@@ -160,24 +172,25 @@ class BinaryTrajectoryGenerator:
             theta = (theta + dtheta) % (2 * np.pi)
 
             inputs[j, 0] = omega
-            inputs[j, 1] = x0
-            inputs[j, 2] = y0
+            if self.include_initial_position:
+                inputs[j, 1] = x0
+                inputs[j, 2] = y0
 
             targets[j, 0] = np.cos(theta)
             targets[j, 1] = np.sin(theta)
 
         return inputs, targets
 
-def generate_dataset(num_samples, num_timesteps, num_trajectories, **kwargs):
-    inputs = np.zeros((num_samples, num_timesteps, 3 * num_trajectories))
+def generate_dataset(num_samples, num_timesteps, num_trajectories, include_initial_position=False, **kwargs):
+    inputs = np.zeros((num_samples, num_timesteps, (3 if include_initial_position else 1) * num_trajectories))
     targets = np.zeros((num_samples, num_timesteps, 2 * num_trajectories))
 
-    generator = BinaryTrajectoryGenerator(num_timesteps, **kwargs)
+    generator = BinaryTrajectoryGenerator(num_timesteps, include_initial_position=include_initial_position, **kwargs)
 
     for i in range(num_samples):
         for j in range(num_trajectories):
             inputs_single, targets_single = generator.generate_trajectory()
-            inputs[i, :, 3*j:3*(j+1)] = inputs_single
+            inputs[i, :, (3 if include_initial_position else 1)*j:(3 if include_initial_position else 1)*(j+1)] = inputs_single
             targets[i, :, 2*j:2*(j+1)] = targets_single
 
     return inputs, targets
