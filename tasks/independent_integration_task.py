@@ -180,12 +180,22 @@ class BinaryTrajectoryGenerator:
             targets[j, 1] = np.sin(theta)
 
         return inputs, targets
+    
+class ConstantTrajectoryGenerator(BinaryTrajectoryGenerator):
+    def generate_binary_omega(self):
+        omegas = self.omega_value * np.ones(self.num_timesteps)
+        return omegas
 
-def generate_dataset(num_samples, num_timesteps, num_trajectories, include_initial_position=False, **kwargs):
+def generate_dataset(num_samples, num_timesteps, num_trajectories, trajectory_type='binary', include_initial_position=False, **kwargs):
     inputs = np.zeros((num_samples, num_timesteps, (3 if include_initial_position else 1) * num_trajectories))
     targets = np.zeros((num_samples, num_timesteps, 2 * num_trajectories))
 
-    generator = BinaryTrajectoryGenerator(num_timesteps, include_initial_position=include_initial_position, **kwargs)
+    if trajectory_type == 'binary':
+        generator = BinaryTrajectoryGenerator(num_timesteps, include_initial_position=include_initial_position, **kwargs)
+    elif trajectory_type == 'constant':
+        generator = ConstantTrajectoryGenerator(num_timesteps, include_initial_position=include_initial_position, **kwargs)
+    else:
+        raise ValueError("Invalid trajectory_type. Expected 'binary' or 'constant'.")
 
     for i in range(num_samples):
         for j in range(num_trajectories):

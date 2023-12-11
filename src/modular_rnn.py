@@ -1,7 +1,11 @@
 import torch 
 import torch.nn as nn   
 import numpy as np
-from utils import generate_alpha_matrix
+from src.utils import generate_alpha_matrix
+relu = nn.ReLU()
+
+torch.set_default_tensor_type(torch.DoubleTensor)
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 class RingModule(nn.Module):
@@ -22,7 +26,7 @@ class RingModule(nn.Module):
                  restingMag=1.0,
                  gammaMultiplier=1.0,
                  pulseMag = 1.0,
-                 pulsePosition = 12
+                 pulsePosition = 50
                  ):
 
         super().__init__()
@@ -55,7 +59,11 @@ class RingModule(nn.Module):
 
         # Setup inputs to ring
         self.input_to_vel = nn.Linear(input_size, 1, bias=False).to(device) # learnable
-        # nn.init.ones_(self.input_to_vel.weight)
+        nn.init.ones_(self.input_to_vel.weight) 
+        # important! note that this initialization, if random, will cause the hidden activity 
+        # initialization to also be random, since the init_hidden() involves running the recurrent dynamics
+        # which calls self.input_to_vel 
+
         self.vel_to_ring = nn.Linear(1, self.hidden_size, bias=True).to(device) # unlearnable
         self.vel_to_ring.weight.requires_grad = False
         self.vel_to_ring.bias.requires_grad = False # fix the bias during training
@@ -84,15 +92,19 @@ class RingModule(nn.Module):
         pulse_inputs = torch.zeros(2 * self.nNeurons, device=self.device)
         pulse_inputs[pulse_inds] = self.pulseMag
 
-        hidden = 0.05 * torch.rand(2 * self.nNeurons, device=self.device)
+        # hidden = 0.005 * torch.rand(2 * self.nNeurons, device=self.device)
+        # hidden = 0.05 * torch.rand(2 * self.nNeurons, device=self.device)
+        hidden = 0.005 * torch.ones(2 * self.nNeurons, device=self.device) + pulse_inputs
 
-        tSetup = 500
+        tSetup = 1_000
 
-        init_drive = torch.tensor([.1,1,0]).double().to(self.device) # some arbitrary drive to initialize
+        # init_drive = torch.tensor([.1,1,0]).double().to(self.device) # some arbitrary drive to initialize
+        init_drive = torch.tensor([.1]).double().to(self.device) # some arbitrary drive to initialize
+
         for t in np.arange(0, tSetup): # run dynamics a little
             hidden = self.recurrence(init_drive, hidden)
 
-        while torch.argmax(hidden[:self.nNeurons]) != self.pulsePosition: # keep running dynamics until bump aligns with initial pulse location
+        while (torch.argmax(hidden[:self.nNeurons]) - self.pulsePosition != 0):
             hidden = self.recurrence(init_drive, hidden)
 
         # print('bumps initialized')
