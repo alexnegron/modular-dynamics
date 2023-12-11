@@ -129,10 +129,10 @@ class BinaryTrajectoryGenerator:
 
     def generate_binary_omega(self):
         omegas =  self.omega_value * np.ones(self.num_timesteps)
-        omegas[0] *= np.random.choice([-1,1]) # random initial direction
+        omegas[0] = self.omega_value * np.random.choice([-1,1]) # random initial direction
 
         # min_distance_between_flips = self.num_timesteps // (self.num_flips + 1)
-        min_distance_between_flips = 100
+        min_distance_between_flips = 50
         flip_times = []
         for _ in range(self.num_flips):
             if flip_times:

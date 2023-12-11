@@ -6,7 +6,6 @@ relu = nn.ReLU()
 
 torch.set_default_tensor_type(torch.DoubleTensor)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
 # torch.set_default_tensor_type(torch.FloatTensor)
 # device = 'mps' if torch.backends.mps.is_built() else 'cpu'
 
@@ -102,7 +101,8 @@ class RingModule(nn.Module):
         tSetup = 1_000
 
         # init_drive = torch.tensor([.1,1,0]).double().to(self.device) # some arbitrary drive to initialize
-        init_drive = torch.tensor([.1]).double().to(self.device) # some arbitrary drive to initialize
+        # init_drive = torch.tensor([.1]).double().to(self.device) # some arbitrary drive to initialize
+        init_drive = torch.full((self.input_size,), 0.1, dtype=torch.double).to(self.device)
 
         for t in np.arange(0, tSetup): # run dynamics a little
             hidden = self.recurrence(init_drive, hidden)
@@ -142,19 +142,22 @@ class RingModule(nn.Module):
         return hidden_acts,  hidden
 
 
-class ModRNN(torch.nn.Module):
-    def __init__(self, input_size, output_size, **kwargs):
+class MultiModRNN(torch.nn.Module):
+    def __init__(self, input_size, output_size, n_modules, **kwargs):
         super().__init__()
 
-        # continuous-time RNN with fixed ring module
-        self.CTRNN = RingModule(input_size, **kwargs)
+        self.mods = nn.ModuleList([RingModule(input_size, **kwargs) for _ in range(n_modules)])
 
         # output from recurrent layer
-        self.output = torch.nn.Linear(self.CTRNN.hidden_size, output_size, bias=True).to(device)
-        # torch.nn.init.kaiming_uniform_(self.output.weight)
+        self.output = torch.nn.Linear(n_modules * self.mods[0].hidden_size, output_size, bias=True).to(device)
 
     def forward(self, x):
-        activity, hidden_state = self.CTRNN(x)
+        activities = []
+        for mod in self.mods:
+            activity, _ = mod(x)
+            activities.append(activity)
+
+        activity = torch.cat(activities, dim=-1)
         out = self.output(activity)
 
         return out, activity
