@@ -141,55 +141,6 @@ class RingModule(nn.Module):
 
         return hidden_acts,  hidden
     
-
-class WTAModule(nn.Module):
-    def __init__(self, input_size, device='cpu', wta_size=2, inh=0.5, exc=0.5, dt=0.5, tau=10.0):
-        super().__init__()
-
-        self.device = device
-        self.input_size = input_size
-        self.wta_size = wta_size
-        self.exc = exc # excitation param
-        self.inh = inh # inhibition param
-        self.dt = dt
-        self.tau = tau
-        self.alpha = dt / tau
-
-        # Setup inputs to WTA module
-        self.input_to_wta = nn.Linear(input_size, self.wta_size, bias=False).to(device)
-        nn.init.ones_(self.input_to_wta.weight)
-
-        # Setup recurrent weights
-        self.w_wta = (torch.eye(self.wta_size) * (self.exc + self.inh) - torch.ones(self.wta_size, self.wta_size) * self.inh).to(device)
-
-    def recurrence(self, input, hidden):
-        # Recurrent dynamics
-        h2h = hidden @ self.w_wta
-        i2h = self.input_to_wta(input)
-        h_pre_act = i2h + h2h
-
-        h_new = (1 - self.alpha)*hidden + self.alpha*torch.relu(h_pre_act)
-        return h_new
-
-    def forward(self, input, hidden=None):
-        
-        if hidden is None:
-            hidden = torch.zeros(input.shape[0], self.wta_size).to(self.device)
-
-        # propagate input through WTA module
-        recurrent_acts = []
-        steps = range(input.shape[0])
-        for t in steps:
-            hidden = self.recurrence(input[t, ...], hidden)
-
-            # store WTA network activity
-            recurrent_acts.append(hidden)
-
-        hidden_acts = torch.stack(recurrent_acts, dim=0)
-
-        return hidden_acts,  hidden
-
-
 class MultiModRNN(torch.nn.Module):
     def __init__(self, input_size, output_size, n_modules, **kwargs):
         super().__init__()
