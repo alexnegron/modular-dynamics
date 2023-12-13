@@ -191,21 +191,34 @@ class WTAModule(nn.Module):
 
 
 class MultiModRNN(torch.nn.Module):
-    def __init__(self, input_size, output_size, n_modules, **kwargs):
+    def __init__(self, input_size, output_size, n_ring_mods, n_wta_mods=0, **kwargs):
         super().__init__()
 
-        self.mods = nn.ModuleList([RingModule(input_size, **kwargs) for _ in range(n_modules)])
+        self.ring_mods = nn.ModuleList([RingModule(input_size, **kwargs) for _ in range(n_ring_mods)])
+        self.wta_mods = nn.ModuleList([WTAModule(n_ring_mods * self.ring_mods[0].hidden_size, **kwargs) for _ in range(n_wta_mods)])
 
         # output from recurrent layer
-        self.output = torch.nn.Linear(n_modules * self.mods[0].hidden_size, output_size, bias=True).to(device)
+        self.output = torch.nn.Linear(n_ring_mods * self.ring_mods[0].hidden_size + (n_wta_mods * self.wta_mods[0].wta_size if n_wta_mods > 0 else 0), output_size, bias=True).to(device)
 
     def forward(self, x):
-        activities = []
-        for mod in self.mods:
+        ring_activities = []
+        for mod in self.ring_mods:
             activity, _ = mod(x)
-            activities.append(activity)
+            ring_activities.append(activity)
+        ring_activity = torch.cat(ring_activities, dim=-1)
 
-        activity = torch.cat(activities, dim=-1)
-        out = self.output(activity)
+        wta_activities = []
+        if self.wta_mods:
+            for mod in self.wta_mods:
+                activity = mod(ring_activity)
+                wta_activities.append(activity)
+            wta_activity = torch.cat(wta_activities, dim=-1)
+        else:
+            wta_activity = torch.tensor([]).to(x.device)
 
-        return out, activity
+        # concatenate the outputs from all modules
+        combined_activity = torch.cat([ring_activity, wta_activity], dim=-1)
+
+        out = self.output(combined_activity)
+
+        return out, combined_activity
