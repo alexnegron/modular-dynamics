@@ -118,39 +118,32 @@ def plot_data(inputs, targets, num_timesteps, sample_idx=0):
 
 
 class BinaryTrajectoryGenerator:
-    def __init__(self, num_timesteps, dt=0.5, num_flips=5, omega_value=0.005, include_initial_position=False, **kwargs):
+    def __init__(self, num_timesteps, dt=0.5, flip_rate=0.01, omega_value=0.005, include_initial_position=False, **kwargs):
         self.num_timesteps = num_timesteps
         self.dt = dt
         self.omega_value = omega_value
-        self.num_flips = num_flips
+        # self.num_flips = num_flips
+        self.flip_rate = flip_rate
         self.include_initial_position = include_initial_position
 
         self.kwargs = kwargs
 
     def generate_binary_omega(self):
         omegas =  self.omega_value * np.ones(self.num_timesteps)
-        omegas[0] = self.omega_value * np.random.choice([-1,1]) # random initial direction
+        initial_direction = np.random.choice([-1, 1])
 
-        # min_distance_between_flips = self.num_timesteps // (self.num_flips + 1)
-        min_distance_between_flips = 50
-        flip_times = []
-        for _ in range(self.num_flips):
-            if flip_times:
-                start = flip_times[-1] + min_distance_between_flips
-            else:
-                start = min_distance_between_flips
-            if start >= self.num_timesteps - min_distance_between_flips:
-                continue
-            flip_time = np.random.choice(range(start, self.num_timesteps - min_distance_between_flips))
-            flip_times.append(flip_time)
+        # Generate flip times following an exponential distribution: E[num_flips] = 1/flip_rate * num_timesteps
+        flip_times = np.cumsum(np.random.exponential(scale=1/self.flip_rate, size=self.num_timesteps))
+        flip_times = flip_times[flip_times < self.num_timesteps].astype(int) 
+        
+        omegas[:flip_times[0]] *= initial_direction # flip initial direction negative (sometimes)
 
-        flip_times = np.sort(flip_times)
-
-        flip_index = 0
-        for t in range(1, self.num_timesteps):
+        flip_index = 1
+        for t in range(flip_times[0], self.num_timesteps):
             if flip_index < len(flip_times) and t == flip_times[flip_index]:
                 omegas[t:] *= -1
                 flip_index += 1
+
         return omegas
 
     def generate_trajectory(self):
