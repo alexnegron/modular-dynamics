@@ -132,7 +132,7 @@ class BinaryTrajectoryGenerator:
         omegas =  self.omega_value * np.ones(self.num_timesteps)
         initial_direction = np.random.choice([-1, 1])
 
-        # Generate flip times following an exponential distribution: E[num_flips] = 1/flip_rate * num_timesteps
+        # Generate flip times following an exponential distribution: E[num_flips] = flip_rate * num_timesteps
         flip_times = np.cumsum(np.random.exponential(scale=1/self.flip_rate, size=self.num_timesteps))
         flip_times = flip_times[flip_times < self.num_timesteps].astype(int) 
         

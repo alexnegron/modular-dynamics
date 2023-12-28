@@ -149,6 +149,7 @@ class MultiModRNN(torch.nn.Module):
 
         # output from recurrent layer
         self.output = torch.nn.Linear(n_modules * self.mods[0].hidden_size, output_size, bias=True).to(device)
+        # note that this output layer is randomly initialized
 
     def forward(self, x):
         activities = []

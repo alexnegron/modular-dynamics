@@ -95,7 +95,7 @@ def generate_dataset(num_samples, num_timesteps, num_trajectories, trajectory_ty
             angular_positions.append(np.arctan2(targets_single[:, 1], targets_single[:, 0]))
 
         if integrate_max:
-            targets[i, :, -1] = np.max(angular_positions, axis=0)  # max of the positions at each time point
+            targets[i, :, -1] = np.argmax(angular_positions, axis=0) 
 
     return inputs, targets
 
