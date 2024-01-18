@@ -52,3 +52,7 @@ def generate_alpha_matrix(neurons,length,alpha,wWeight=8,
     real_w[:neurons,neurons:] = wMatrix[:neurons,neurons+cutoff:end] #off diagonals
     real_w[neurons:,:neurons] = wMatrix[neurons+cutoff:end,:neurons]
     return real_w
+
+
+
+

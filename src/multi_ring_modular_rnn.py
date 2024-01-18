@@ -23,6 +23,7 @@ class RingModule(nn.Module):
                  tau=10.0,
                  alpha = 1.0,
                  wWeight=8.0,
+                 train_wWeight=False,
                  wShift=2,
                  wScaling=True,
                  restingMag=1.0,
@@ -43,13 +44,16 @@ class RingModule(nn.Module):
         self.tau = tau
         self.alpha = dt / tau
         self.phiFunction = nn.ReLU()
-        self.wAttractor = generate_alpha_matrix(nNeurons,
-                                                length,
-                                                alpha,
-                                                wWeight,
-                                                wShift,
-                                                wScaling,
-                                                device=device).to(device)
+        self.train_wWeight = train_wWeight
+        self.wWeight = nn.Parameter(torch.tensor(wWeight, dtype=torch.float32, device=self.device), requires_grad=train_wWeight)
+        self.wShift = wShift
+        self.wScaling = wScaling
+        self.wAttractor = self.generate_alpha_matrix_diff(self.nNeurons,
+                                            self.length,
+                                            1.0, 
+                                            self.wShift,
+                                            self.wScaling,
+                                            self.device).to(self.device)
 
         self.gNoiseMag = gNoiseMag
         self.fano = fano
@@ -61,7 +65,8 @@ class RingModule(nn.Module):
 
         # Setup inputs to ring
         self.input_to_vel = nn.Linear(input_size, 1, bias=False).to(device) # learnable
-        nn.init.ones_(self.input_to_vel.weight) 
+        nn.init.ones_(self.input_to_vel.weight)
+        # nn.init.constant_(self.input_to_vel.weight, 0.5) 
         # important! note that this initialization, if random, will cause the hidden activity 
         # initialization to also be random, since the init_hidden() involves running the recurrent dynamics
         # which calls self.input_to_vel 
@@ -75,6 +80,38 @@ class RingModule(nn.Module):
         self.vel_to_ring.weight.data.copy_(self.gamma); # set coupling from 'velocity' neuron to ring network manually
         self.vel_to_ring.bias.copy_(torch.ones((self.hidden_size,))); # bias is fixed at 1
 
+    def generate_w_matrix_diff(self, device, nNeurons, nBumps, length=40, wShift=2, wScaling=True):
+        length2 = int(2 * torch.ceil(torch.tensor(length)))
+        positions = torch.arange(-length2, length2 + 1, device=device)
+        if wScaling:
+            strength = self.wWeight * nBumps / nNeurons
+        else:
+            strength = self.wWeight
+
+        values = strength * (torch.cos((np.pi * positions / length)) - 1) / 2
+        values *= torch.abs(positions) < 2 * length
+
+        wUnshifted = torch.zeros(nNeurons, device=device)
+        for position, w in zip(positions, values):
+            wUnshifted[position % nNeurons] += w
+
+        wQuadrant = torch.vstack([torch.roll(wUnshifted, i) for i in range(nNeurons)])
+        wMatrix = torch.hstack((torch.roll(wQuadrant, -wShift, 0), torch.roll(wQuadrant, wShift, 0)))
+        wMatrix = torch.vstack((wMatrix, wMatrix))
+
+        return wMatrix
+    
+    def generate_alpha_matrix_diff(self, neurons, length, alpha, wShift=2, wScaling=True, device='cpu'):
+        cutoff = int((1-alpha)*length)
+        wMatrix = self.generate_w_matrix_diff(device, neurons+cutoff, 1, length, wShift, wScaling)
+        real_w = torch.zeros((neurons*2,neurons*2), device=device)
+        end = 2*neurons + cutoff
+        real_w[:neurons,:neurons] = wMatrix[:neurons,:neurons]
+        real_w[neurons:,neurons:] = wMatrix[neurons+cutoff:end,neurons+cutoff:end]
+        real_w[:neurons,neurons:] = wMatrix[:neurons,neurons+cutoff:end]
+        real_w[neurons:,:neurons] = wMatrix[neurons+cutoff:end,:neurons]
+        return real_w
+    
     def init_hidden(self):
         """
         Initialize the activities in each ring.
@@ -127,6 +164,18 @@ class RingModule(nn.Module):
     def forward(self, input, hidden=None):
         if hidden is None: # initialize ring neuron states
             hidden = self.init_hidden()
+
+        
+        if self.train_wWeight: # update ring module weights 
+            self.wAttractor = self.generate_alpha_matrix_diff(self.nNeurons,
+                                                self.length,
+                                                1.0, 
+                                                self.wShift,
+                                                self.wScaling,
+                                                self.device).to(self.device)
+            # clamp wWeight to ensure it stays within given range 
+            self.wWeight.data.clamp_(5.0, 15.0)
+
 
         # propagate input through ring module
         recurrent_acts = []

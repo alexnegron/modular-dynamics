@@ -118,14 +118,17 @@ def plot_data(inputs, targets, num_timesteps, sample_idx=0):
 
 
 class BinaryTrajectoryGenerator:
-    def __init__(self, num_timesteps, dt=0.5, flip_rate=0.01, omega_value=0.005, include_initial_position=False, **kwargs):
+    def __init__(self, num_timesteps, dt=0.5, flip_rate=0.01, omega_value=0.005, gain=False, **kwargs):
         self.num_timesteps = num_timesteps
         self.dt = dt
-        self.omega_value = omega_value
-        # self.num_flips = num_flips
         self.flip_rate = flip_rate
-        self.include_initial_position = include_initial_position
+        self.gain = gain
+        if gain == True:
+            self.g = np.random.uniform(0.5, 1.5)
+        else: 
+            self.g = 1.0
 
+        self.omega_value = omega_value * self.g if gain else omega_value
         self.kwargs = kwargs
 
     def generate_binary_omega(self):
@@ -150,9 +153,7 @@ class BinaryTrajectoryGenerator:
         omegas = self.generate_binary_omega()
         theta0 = 0
         theta = theta0
-        x0 = np.cos(theta0)
-        y0 = np.sin(theta0)
-        inputs = np.zeros((self.num_timesteps, 3 if self.include_initial_position else 1))
+        inputs = np.zeros((self.num_timesteps, 2 if self.gain else 1))
         targets = np.zeros((self.num_timesteps, 2))
 
         for j in range(self.num_timesteps):
@@ -164,36 +165,35 @@ class BinaryTrajectoryGenerator:
             dtheta = (k1 + 2 * k2 + 2 * k3 + k4) / 6
             theta = (theta + dtheta) % (2 * np.pi)
 
-            inputs[j, 0] = omega
-            if self.include_initial_position:
-                inputs[j, 1] = x0
-                inputs[j, 2] = y0
+            inputs[j, 0] = omega 
+            if self.gain: 
+                inputs[j, 1] = self.g
 
             targets[j, 0] = np.cos(theta)
             targets[j, 1] = np.sin(theta)
-
+            
         return inputs, targets
     
 class ConstantTrajectoryGenerator(BinaryTrajectoryGenerator):
     def generate_binary_omega(self):
-        omegas = self.omega_value * np.ones(self.num_timesteps)
+        omegas = self.omega_value * np.ones(self.num_timesteps) * self.alpha 
         return omegas
 
-def generate_dataset(num_samples, num_timesteps, num_trajectories, trajectory_type='binary', include_initial_position=False, **kwargs):
-    inputs = np.zeros((num_samples, num_timesteps, (3 if include_initial_position else 1) * num_trajectories))
-    targets = np.zeros((num_samples, num_timesteps, 2 * num_trajectories))
-
+def generate_dataset(num_samples, num_timesteps, num_trajectories, trajectory_type='binary', **kwargs):
     if trajectory_type == 'binary':
-        generator = BinaryTrajectoryGenerator(num_timesteps, include_initial_position=include_initial_position, **kwargs)
+        generator = BinaryTrajectoryGenerator(num_timesteps, **kwargs)
     elif trajectory_type == 'constant':
-        generator = ConstantTrajectoryGenerator(num_timesteps, include_initial_position=include_initial_position, **kwargs)
+        generator = ConstantTrajectoryGenerator(num_timesteps, **kwargs)
     else:
         raise ValueError("Invalid trajectory_type. Expected 'binary' or 'constant'.")
+
+    inputs = np.zeros((num_samples, num_timesteps, (2 if generator.gain else 1) * num_trajectories))
+    targets = np.zeros((num_samples, num_timesteps, 2 * num_trajectories))
 
     for i in range(num_samples):
         for j in range(num_trajectories):
             inputs_single, targets_single = generator.generate_trajectory()
-            inputs[i, :, (3 if include_initial_position else 1)*j:(3 if include_initial_position else 1)*(j+1)] = inputs_single
+            inputs[i, :, (2 if generator.gain else 1)*j:(2 if generator.gain else 1)*(j+1)] = inputs_single
             targets[i, :, 2*j:2*(j+1)] = targets_single
 
     return inputs, targets
