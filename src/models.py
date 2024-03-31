@@ -1,11 +1,11 @@
 import torch.nn as nn
 import torch
 from torch.autograd import Variable
-from multi_ring_modular_rnn import MultiModRNN
+from src.multi_ring_modular_rnn import MultiModRNN
 
 class RNNBase(nn.Module):
     def __init__(self,architecture,neurons,activation,input_dim,
-                output_dim,seed,sigma,**rnn_kwargs):
+                output_dim,seed,**rnn_kwargs):
         '''
         Initializes RNN from config data
         '''
@@ -13,7 +13,6 @@ class RNNBase(nn.Module):
         self.architecture = architecture
         self.input_dim = input_dim
         self.hidden_size = neurons
-        self.sigma = sigma #won't use yet
         self.activation = activation
         self.nonlinearity = nn.ReLU() if activation == 'relu' else nn.Tanh()
         torch.manual_seed(seed) #set random seed
@@ -52,6 +51,9 @@ class RNNBase(nn.Module):
         elif self.architecture == "ModularRNN":
             self.rnn = MultiModRNN
 
+        else:
+            raise ValueError('Invalid RNN architecture')
+
         self.rnn = self.rnn(*args, **kwargs)
         
     def forward(self,inputs,hidden=None):
@@ -83,6 +85,7 @@ class RNN(nn.Module):
             hidden = self.forward_pass(inputs[:,time],hidden)
             hiddens.append(hidden)
         hiddens = torch.cat(hiddens,dim=0)
+        import pdb; pdb.set_trace()
         hiddens = torch.permute(hiddens, (1, 0, 2))
         return hiddens, None
 

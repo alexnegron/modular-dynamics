@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
-from independent_integration_task import generate_dataset
+from tasks.independent_integration_task import generate_dataset
 import numpy as np
 
 class IntegrationDataset(Dataset):
@@ -11,27 +11,30 @@ class IntegrationDataset(Dataset):
         self.min_length = min_length
         self.max_length = max_length
         self.sample_length = sample_length
-        self.trajectory_type = self.trajectory_type
+        self.trajectory_type = trajectory_type
+        self.test = False
 
     def test(self):
+        self.test = True
         self.sample_length = False
 
     def train(self):
+        self.test = False
         self.sample_length = True
 
     def __len__(self):
         #put a fixed number here just for completeness
-        return self.batch_size*100
+        return self.batch_size*10
 
     def __getitem__(self, idx):
         if self.sample_length:
-            length = np.random.uniform(self.min_length,self.max_length)
+            length = np.random.randint(self.min_length,self.max_length)
         else:
             length = self.max_length
 
         inputs,targets = generate_dataset(self.batch_size,length,self.sample_length,self.trajectory_type)
 
-        inputs = torch.tensor(inputs).float()
-        targets = torch.tensor(targets).float()
+        inputs = torch.tensor(inputs)
+        targets = torch.tensor(targets)
 
         return inputs,targets
