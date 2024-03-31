@@ -6,11 +6,11 @@ model:
   rnn_kwargs: 
 
 training:
-  loss: 'cosine'
-  clip_value: None
+  loss: mse
+  clip_value: 
   lr: 0.05
   weight_decay: 0.01
-  epochs: 2
+  epochs: 1
 
 
 task:

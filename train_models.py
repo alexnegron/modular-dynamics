@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import h5py
 import logging
 import pickle
+from torch.nn.functional import cosine_similarity
 
 logger = logging.getLogger(__name__)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -32,7 +33,7 @@ def initialize_loss_fxn(training_cfg):
     elif training_cfg.loss == 'angular':
         criterion = angular_loss
     elif training_cfg.loss == 'cosine':
-        criterion = torch.nn.CosineSimilarity()
+        criterion = lambda x1,x2: cosine_similarity(x1,x2,dim=-1).mean()
     
     return criterion
 
@@ -59,7 +60,6 @@ def train_model(model,dataloader,training_cfg):
 
             loss = criterion(outputs,targets)
             
-            import pdb; pdb.set_trace()
             loss.backward()
 
             if clip_value is not None:
@@ -84,36 +84,32 @@ def test_model(cfg,model,task):
     
     criterion = initialize_loss_fxn(cfg.training)
 
-    task.test()
+    task.set_test()
     task.batch_size=cfg.task.test_batch_size
-    dataloader = DataLoader(task,batch_size=cfg.batch_size,shuffle=True)
+    dataloader = DataLoader(task,batch_size=cfg.task.test_batch_size,shuffle=True)
 
-    hidden_activity = []
     net_loss = 0.0
     all_inputs,all_outputs,all_targets = [],[],[]
     for i,data in enumerate(dataloader):
 
         inputs,targets = data
-        inputs.to(device)
-        targets.to(device)
+        inputs = inputs.to(device).to(torch.float64)
+        targets = targets.to(device).to(torch.float64)
+        print(inputs.shape,targets.shape)
 
-        outputs, hiddens = model(inputs)
-        hidden_activity.append(hiddens)
-
-        all_inputs.append(inputs)
-        all_outputs.append(outputs)
-        all_targets.append(targets)
+        hiddens, outputs = model(inputs)
 
         loss = criterion(outputs,targets)
         net_loss += loss
         logger.info(f'Test Loss: {loss.item()}')
 
     net_loss /= len(dataloader)
-    all_inputs = np.array(inputs)
-    all_outputs = np.array(outputs)
-    all_targets = np.array(targets)
+    all_inputs = inputs.cpu().numpy()
+    all_outputs = outputs.cpu().detach().numpy()
+    all_targets = targets.cpu().numpy()
+    all_hidden_activity = hiddens.detach().cpu().numpy()
     
-    return net_loss,hidden_activity,all_inputs,all_outputs,all_targets
+    return net_loss.item(),all_hidden_activity,all_inputs,all_outputs,all_targets
 
 def save_results(model,losses,net_loss,hidden_activity,all_inputs,all_outputs,all_targets):
     #same model to pickle
