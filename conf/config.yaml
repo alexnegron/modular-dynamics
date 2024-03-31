@@ -15,7 +15,7 @@ training:
 
 task:
   dim: 1
-  batch_size: 1
+  batch_size: 10
   min_length: 1000
   max_length: 1500
   sample_length: True

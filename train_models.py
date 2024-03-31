@@ -76,7 +76,7 @@ def initialize_dataloader(cfg):
     task = IntegrationDataset(cfg.task.dim,cfg.task.batch_size,cfg.task.min_length,
                               cfg.task.max_length,cfg.task.sample_length)
     
-    dataloader = DataLoader(task,batch_size=cfg.task.batch_size,shuffle=True)
+    dataloader = DataLoader(task,batch_size=cfg.task.batch_size,shuffle=False)
 
     return task,dataloader
 
@@ -86,7 +86,7 @@ def test_model(cfg,model,task):
 
     task.set_test()
     task.batch_size=cfg.task.test_batch_size
-    dataloader = DataLoader(task,batch_size=cfg.task.test_batch_size,shuffle=True)
+    dataloader = DataLoader(task,batch_size=cfg.task.test_batch_size,shuffle=False)
 
     net_loss = 0.0
     all_inputs,all_outputs,all_targets = [],[],[]
