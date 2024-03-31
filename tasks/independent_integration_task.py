@@ -179,7 +179,7 @@ class ConstantTrajectoryGenerator(BinaryTrajectoryGenerator):
         omegas = self.omega_value * np.ones(self.num_timesteps) * self.alpha 
         return omegas
 
-def generate_dataset(num_samples, num_timesteps, num_trajectories, trajectory_type='binary', **kwargs):
+def generate_dataset(num_timesteps, num_trajectories, trajectory_type='binary', **kwargs):
     if trajectory_type == 'binary':
         generator = BinaryTrajectoryGenerator(num_timesteps, **kwargs)
     elif trajectory_type == 'constant':
@@ -187,13 +187,12 @@ def generate_dataset(num_samples, num_timesteps, num_trajectories, trajectory_ty
     else:
         raise ValueError("Invalid trajectory_type. Expected 'binary' or 'constant'.")
 
-    inputs = np.zeros((num_samples, num_timesteps, (2 if generator.gain else 1) * num_trajectories))
-    targets = np.zeros((num_samples, num_timesteps, 2 * num_trajectories))
+    inputs = np.zeros((num_timesteps, (2 if generator.gain else 1) * num_trajectories))
+    targets = np.zeros((num_timesteps, 2 * num_trajectories))
 
-    for i in range(num_samples):
-        for j in range(num_trajectories):
-            inputs_single, targets_single = generator.generate_trajectory()
-            inputs[i, :, (2 if generator.gain else 1)*j:(2 if generator.gain else 1)*(j+1)] = inputs_single
-            targets[i, :, 2*j:2*(j+1)] = targets_single
+    for j in range(num_trajectories):
+        inputs_single, targets_single = generator.generate_trajectory()
+        inputs[:, (2 if generator.gain else 1)*j:(2 if generator.gain else 1)*(j+1)] = inputs_single
+        targets[:, 2*j:2*(j+1)] = targets_single
 
     return inputs, targets

@@ -85,7 +85,6 @@ class RNN(nn.Module):
             hidden = self.forward_pass(inputs[:,time],hidden)
             hiddens.append(hidden)
         hiddens = torch.cat(hiddens,dim=0)
-        import pdb; pdb.set_trace()
         hiddens = torch.permute(hiddens, (1, 0, 2))
         return hiddens, None
 
