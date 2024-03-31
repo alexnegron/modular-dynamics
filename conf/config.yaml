@@ -1,16 +1,18 @@
 model:
-  architecture: VanillaRNN
+  architecture: ModularRNN
   neurons: 50
   activation: relu
   seed: 7
   rnn_kwargs: 
+    n_modules: 1
 
 training:
   loss: mse
   clip_value: 
   lr: 0.05
   weight_decay: 0.01
-  epochs: 1
+  epochs: 10
+  num_batches: 10
 
 
 task:
@@ -20,5 +22,6 @@ task:
   max_length: 1500
   sample_length: True
   test_batch_size: 200
+  omega_value: 0.05
 
 

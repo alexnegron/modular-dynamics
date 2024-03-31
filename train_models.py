@@ -74,7 +74,8 @@ def train_model(model,dataloader,training_cfg):
 
 def initialize_dataloader(cfg):
     task = IntegrationDataset(cfg.task.dim,cfg.task.batch_size,cfg.task.min_length,
-                              cfg.task.max_length,cfg.task.sample_length)
+                              cfg.task.max_length,cfg.task.sample_length,num_batches=cfg.training.num_batches,
+                              omega_value=cfg.task.omega_value)
     
     dataloader = DataLoader(task,batch_size=cfg.task.batch_size,shuffle=False)
 
