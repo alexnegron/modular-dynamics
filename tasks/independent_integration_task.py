@@ -118,7 +118,7 @@ def plot_data(inputs, targets, num_timesteps, sample_idx=0):
 
 
 class BinaryTrajectoryGenerator:
-    def __init__(self, num_timesteps, dt=0.5, flip_rate=0.01, omega_value=0.005, gain=False, **kwargs):
+    def __init__(self, num_timesteps, dt=0.5, flip_rate=0.01, omega_value=0.5, gain=False, **kwargs):
         self.num_timesteps = num_timesteps
         self.dt = dt
         self.flip_rate = flip_rate

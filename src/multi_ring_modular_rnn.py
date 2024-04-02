@@ -13,7 +13,6 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 class RingModule(nn.Module):
     def __init__(self,
                  input_size,
-                 device='cpu',
                  nNeurons=100,
                  nBumps=1,
                  length=40,
@@ -200,7 +199,7 @@ class MultiModRNN(torch.nn.Module):
         self.output = torch.nn.Linear(n_modules * self.mods[0].hidden_size, output_size, bias=True).to(device)
         # note that this output layer is randomly initialized
 
-    def forward(self, x):
+    def forward(self, x, hidden=None):
         activities = []
         for mod in self.mods:
             activity, _ = mod(x)

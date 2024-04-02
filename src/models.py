@@ -20,11 +20,12 @@ class RNNBase(nn.Module):
         self.rnn_kwargs = rnn_kwargs
         self.initialize_rnn(**rnn_kwargs)
         self.out = nn.Linear(self.hidden_size,output_dim)
-        for w in self.parameters():
-            if len(w.shape) == 1:
-                nn.init.zeros_(w) #fill bias with 0s initially
-            else:
-                nn.init.xavier_uniform_(w, gain=1.0)
+        # if self.architecture != 'ModularRNN':
+        #     for w in self.parameters():
+        #         if len(w.shape) == 1:
+        #             nn.init.zeros_(w) #fill bias with 0s initially
+        #         else:
+        #             nn.init.xavier_uniform_(w, gain=1.0)
 
     def initialize_rnn(self,**rnn_kwargs):
         args = [self.input_dim,self.hidden_size]
