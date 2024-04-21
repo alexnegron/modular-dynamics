@@ -37,6 +37,7 @@ class CTRNN(nn.Module):
         # Hidden to hidden layer
         self.recurrent_weights = nn.Parameter(torch.Tensor(self.hidden_size, self.hidden_size), requires_grad=True).to(device)
         nn.init.xavier_uniform_(self.recurrent_weights)
+        
     def init_hidden(self):
         """
         Initialize the activities recurrent layer.
