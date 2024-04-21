@@ -1,24 +1,27 @@
 model:
   architecture: VanillaRNN
-  neurons: 50
+  neurons: 100
   activation: relu
-  seed: 7
+  seed: 10
   rnn_kwargs: 
+   
 
 training:
   loss: mse
   clip_value: 
   lr: 0.05
-  weight_decay: 0.01
-  epochs: 1
+  weight_decay: 1e-8
+  epochs: 100
+  num_batches: 100
 
 
 task:
   dim: 1
-  batch_size: 10
+  batch_size: 32
   min_length: 1000
-  max_length: 1500
+  max_length: 1001
   sample_length: True
   test_batch_size: 200
+  omega_value: 0.05
 
 
